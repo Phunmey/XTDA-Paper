@@ -1,14 +1,11 @@
 import random
-import sys
 from datetime import datetime
 from time import time
 import numpy as np
-from numpy import inf
 import pandas as pd
 from igraph import *
 import gudhi as gd
 import gudhi.representations
-from gudhi.representations import Landscape
 from sklearn.manifold import MDS
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
@@ -17,7 +14,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 
 random.seed(42)
 
-def read_csv(dataset):
+
+def reading_csv():
 
     df_edges = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
     df_edges.columns = ['from', 'to']
@@ -33,14 +31,15 @@ def read_csv(dataset):
     unique_graph_indicator = np.arange(min(graph_indicators),
                                        max(graph_indicators) + 1)  # list unique graph ids in a dataset
 
-    X_train, X_test, y_train, y_test = train_test_split(unique_graph_indicator, graph_labels, test_size=0.2,
+    x_train, x_test, y_train, y_test = train_test_split(unique_graph_indicator, graph_labels, test_size=0.2,
                                                         random_state=42)
 
-    return X_train, X_test, y_train, y_test, graph_indicators, df_edges, graph_labels
+    return x_train, x_test, y_train, y_test, graph_indicators, df_edges, graph_labels
 
 
-def landscape_train(X_train, graph_indicators, df_edges, step_size):  # this is for the train data
+def landscape_train(x_train, graph_indicators, df_edges):  # this is for the train data
     start2 = time()
+
     train_landscape = []
     graph_density = []
     graph_diameter = []
@@ -50,7 +49,8 @@ def landscape_train(X_train, graph_indicators, df_edges, step_size):  # this is 
     cliques = []
     motifs = []
     components = []
-    for i in X_train:
+
+    for i in x_train:
         graph_id = i
         id_location = [index+1 for index, element in enumerate(graph_indicators) if
                        element == graph_id]  # list the index of the graph_id locations
@@ -71,21 +71,22 @@ def landscape_train(X_train, graph_indicators, df_edges, step_size):  # this is 
             norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix)
             matrix_mds = MDS(n_components=2, dissimilarity='precomputed').fit_transform(norm_dmatrix)
 
-        train_alpha_complex = gd.AlphaComplex(points=matrix_mds)
-        train_simplex_tree = train_alpha_complex.create_simplex_tree()
-        train_diagrams = np.asarray(train_simplex_tree.persistence(), dtype='object')
+        train_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
+    #    train_dgm = train_ac.persistence()  # obtain persistence values
+    #    gd.plot_persistence_diagram(train_dgm)
+    #    plt.show()
 
+    #    select dimensions 0 and 1
+    #    train_dgm_0 = train_ac.persistence_intervals_in_dimension(0)
+        train_dgm_1 = train_ac.persistence_intervals_in_dimension(1)
 
-        #select dimensions 0 and 1
-        train_persist_0 = train_diagrams[:, 1][np.where(train_diagrams[:, 0] == 0)]
-        train_persist_1 = train_diagrams[:, 1][np.where(train_diagrams[:, 0] == 1)]
-        train_0 = np.array([list(x) for x in train_persist_0])
-        train_1 = np.array([list(y) for y in train_persist_1])
-        merge_array = [train_0, train_1]
-        sample_range = np.linspace(0, 1, step_size)
-        traingraph_landscape = Landscape(num_landscapes=1, resolution=len(sample_range),
-                                         sample_range=[min(sample_range), max(sample_range)]).fit_transform(merge_array)
-        train_landscape.append(traingraph_landscape[0] + traingraph_landscape[1])
+    #    obtain persistence landscape values
+        landscape_init = gd.representations.Landscape(num_landscapes=1, resolution=1000)
+        land_scape = landscape_init.fit_transform([train_dgm_1])
+    #    plt.plot(land_scape[0][:1000])
+    #    plt.show()
+
+        train_landscape.append(land_scape)
 
 
         Density = create_traingraph.density()  # obtain density
@@ -109,7 +110,7 @@ def landscape_train(X_train, graph_indicators, df_edges, step_size):  # this is 
         motifs.append(motifs_count)
         components.append(count_components)
 
-    df1 = pd.DataFrame(train_landscape)
+    df1 = pd.DataFrame(np.concatenate(train_landscape))
     df2 = pd.DataFrame(motifs)
     df3 = pd.DataFrame(list(zip(graph_density, graph_diameter, clustering_coeff, spectral_gap, assortativity_, cliques, components)))
     train_data = pd.concat([df1, df2, df3], axis=1, ignore_index=True)
@@ -118,11 +119,12 @@ def landscape_train(X_train, graph_indicators, df_edges, step_size):  # this is 
     t2 = time()
     train_time = t2 - start2
 
-    return train_data, train_time, sample_range
+    return train_data, train_time
 
 
-def landscape_test(X_test, graph_indicators, df_edges, sample_range, train_time):  # this is for the train test
+def landscape_test(x_test, graph_indicators, df_edges, train_time):  # this is for the train test
     start3 = time()
+
     test_landscape = []
     test_graph_density = []
     test_graph_diameter = []
@@ -132,7 +134,8 @@ def landscape_test(X_test, graph_indicators, df_edges, sample_range, train_time)
     test_cliques = []
     test_motifs = []
     test_components = []
-    for j in X_test:
+
+    for j in x_test:
         graph_id = j
         id_location = [index+1 for index, element in enumerate(graph_indicators) if
                        element == graph_id]  # list the index of the graph_id locations
@@ -153,20 +156,22 @@ def landscape_test(X_test, graph_indicators, df_edges, sample_range, train_time)
             norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix)
             matrix_mds = MDS(n_components=2, dissimilarity='precomputed').fit_transform(norm_dmatrix)
 
-        test_alpha_complex = gd.AlphaComplex(points=matrix_mds)  # initialize alpha complex
-        test_simplex_tree = test_alpha_complex.create_simplex_tree()  # creating a simplex tree
-        test_diagrams = np.asarray(test_simplex_tree.persistence(),
-                                   dtype='object')
+        test_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
+    #    test_dgm = test_ac.persistence()  # obtain persistence values
+    #    gd.plot_persistence_diagram(train_dgm)
+    #    plt.show()
 
-        #select dimensions 0 and 1
-        test_persist_0 = test_diagrams[:, 1][np.where(test_diagrams[:, 0] == 0)]
-        test_persist_1 = test_diagrams[:, 1][np.where(test_diagrams[:, 0] == 1)]
-        test_0 = np.array([list(x) for x in test_persist_0])
-        test_1 = np.array([list(y) for y in test_persist_1])
-        merged_array = [test_0, test_1]
-        testgraph_landscape = Landscape(num_landscapes=1, resolution=len(sample_range),
-                                        sample_range=[min(sample_range), max(sample_range)]).fit_transform(merged_array)
-        test_landscape.append(testgraph_landscape[0] + testgraph_landscape[1])
+    #    select dimensions 0 and 1
+    #    test_dgm_0 = test_ac.persistence_intervals_in_dimension(0)
+        test_dgm_1 = test_ac.persistence_intervals_in_dimension(1)
+
+    #    obtain persistence landscape values
+        landscape_init = gd.representations.Landscape(num_landscapes=1, resolution=1000)
+        land_scape = landscape_init.fit_transform([test_dgm_1])
+    #    plt.plot(land_scape[0][:1000])
+    #    plt.show()
+
+        test_landscape.append(land_scape)
 
         Density = create_testgraph.density()  # obtain density
         Diameter = create_testgraph.diameter()  # obtain diameter
@@ -189,7 +194,7 @@ def landscape_test(X_test, graph_indicators, df_edges, sample_range, train_time)
         test_motifs.append(motifs_count)
         test_components.append(count_components)
 
-    df1_ = pd.DataFrame(test_landscape)
+    df1_ = pd.DataFrame(np.concatenate(test_landscape))
     df2_ = pd.DataFrame(test_motifs)
     df3_ = pd.DataFrame(
         list(zip(test_graph_density, test_graph_diameter, test_clustering_coeff, test_spectral_gap, test_assortativity_, test_cliques, test_components)))
@@ -208,18 +213,20 @@ def tuning_hyperparameter():
     n_estimators = [int(a) for a in np.linspace(start=200, stop=500, num=5)]
     max_depth = [int(b) for b in np.linspace(start=2, stop=10, num=6)]
     num_cv = 10
+    bootstrap = [True, False]
     gridlength = len(n_estimators) * len(max_depth) * num_cv
     print(str(gridlength) + " RFs will be created in the grid search.")
-    Param_Grid = dict(n_estimators=n_estimators, max_depth=max_depth)
+    param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, bootstrap=bootstrap)
 
-    return Param_Grid, num_cv
+    return param_grid, num_cv
 
 
-def random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, landscape_time, num_cv):
+def random_forest(param_grid, train_data, test_data, y_train, y_test, landscape_time, num_cv):
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
     start5 = time()
+
     rfc = RandomForestClassifier()
-    grid = GridSearchCV(estimator=rfc, param_grid=Param_Grid, cv=num_cv, n_jobs=10)
+    grid = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=num_cv, n_jobs=10)
     grid.fit(train_data, y_train)
     param_choose = grid.best_params_
     if len(set(y_test)) > 2:  # multiclass case
@@ -251,22 +258,21 @@ def random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, l
 
 
 def main():
-    X_train, X_test, y_train, y_test, graph_indicators, df_edges, graph_labels = read_csv(dataset)
-    train_data, train_time, sample_range = landscape_train(X_train, graph_indicators, df_edges, step_size)
-    test_data, landscape_time = landscape_test(X_test, graph_indicators, df_edges, sample_range, train_time)
-    Param_Grid, num_cv = tuning_hyperparameter()
-    random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, landscape_time,num_cv)
+    x_train, x_test, y_train, y_test, graph_indicators, df_edges, graph_labels = reading_csv()
+    train_data, train_time = landscape_train(x_train, graph_indicators, df_edges)
+    test_data, landscape_time = landscape_test(x_test, graph_indicators, df_edges, train_time)
+    param_grid, num_cv = tuning_hyperparameter()
+    random_forest(param_grid, train_data, test_data, y_train, y_test, landscape_time, num_cv)
 
 
 if __name__ == '__main__':
     data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"	#dataset path on computer
-    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K' )
+    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
     outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results3/" + 'Alpha_MLgraph.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
-        for step_size in [100]:  # we will consider step size 100 for epsilon
-            for duplication in np.arange(5):
-                main()
+        for duplication in np.arange(5):
+            main()
     file.close()
 
 #
