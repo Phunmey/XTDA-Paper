@@ -4,8 +4,9 @@ from time import time
 import numpy as np
 import pandas as pd
 from igraph import *
-from gudhi.representations import Landscape
 from ripser import ripser
+import gudhi as gd
+import gudhi.representations
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -13,7 +14,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 random.seed(42)
 
 
-def read_csv(dataset):
+def reading_csv():
+
     df_edges = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
     df_edges.columns = ['from', 'to']
     print("Graph edges are loaded")
@@ -28,67 +30,75 @@ def read_csv(dataset):
     unique_graph_indicator = np.arange(min(graph_indicators),
                                        max(graph_indicators) + 1)  # list unique graph ids
 
-    X_train, X_test, y_train, y_test = train_test_split(unique_graph_indicator, graph_labels, test_size=0.2,
+    x_train, x_test, y_train, y_test = train_test_split(unique_graph_indicator, graph_labels, test_size=0.2,
                                                         random_state=42)
 
-    return X_train, X_test, y_train, y_test, graph_indicators, df_edges, graph_labels
+    return x_train, x_test, y_train, y_test, graph_indicators, df_edges, graph_labels
 
 
-def landscape_train(X_train, thresh, graph_indicators, df_edges, step_size):  # this is for the train test
+def landscape_train(x_train, graph_indicators, df_edges):  # this is for the train test
     start2 = time()
+
     train_landscape = []
-    for i in X_train:
+    for i in x_train:
         graph_id = i
         id_location = [index + 1 for index, element in enumerate(graph_indicators) if
                        element == graph_id]  # list the index of the graph_id locations
         graph_edges = df_edges[df_edges['from'].isin(id_location)]
         create_traingraph = Graph.TupleList(graph_edges.itertuples(index=False), directed=False, weights=True)
-        train_distance_matrix = np.asarray(Graph.shortest_paths_dijkstra(create_traingraph))
-        train_normalize = train_distance_matrix / np.nanmax(train_distance_matrix[train_distance_matrix != np.inf])
-        train_diagrams = ripser(train_normalize, thresh=thresh, maxdim=1, distance_matrix=True)[
-            'dgms']  # maximum homology dimension computed i.e H_0, H_1 for maxdim=1. thresh is maximum distance considered when constructing filtration
-        #  plot_diagrams(train_diagrams, title= "train persistence diagrams showing H_0 and H_1",  show=True) #using thresh=1 because the largest number in the matrix is 1
-        sample_range = np.linspace(0, thresh, step_size)
-        traingraph_landscape = Landscape(num_landscapes=1, resolution=len(sample_range),
-                                         sample_range=[min(sample_range), max(sample_range)]).fit_transform(
-            train_diagrams)
-        train_landscape.append(traingraph_landscape[0] + traingraph_landscape[1])
+        create_dmatrix = np.asarray(Graph.shortest_paths_dijkstra(create_traingraph))
+        norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix[create_dmatrix != np.inf])
+        train_rips = ripser(norm_dmatrix, thresh=1, maxdim=1, distance_matrix=True)[
+            'dgms']
+
+    #    splitting the dimension into 0 and 1
+        train_dgm_0 = train_rips[0]
+        train_dgm_1 = train_rips[1]
+
+    #    obtain persistence landscape values
+        landscape_init = gd.representations.Landscape(num_landscapes=1, resolution=1000)
+        land_scape = landscape_init.fit_transform([train_dgm_1])
+
+        train_landscape.append(land_scape)
 
     t2 = time()
     train_time = t2 - start2
 
-    return train_landscape, train_time, sample_range
+    return train_landscape, train_time
 
 
-def landscape_test(X_test, thresh, graph_indicators, df_edges, sample_range, train_time, train_landscape):
+def landscape_test(x_test, graph_indicators, df_edges, train_time, train_landscape):
     start3 = time()
+
     test_landscape = []
-    for j in X_test:
+    for j in x_test:
         graph_id = j
         id_location = [index + 1 for index, element in enumerate(graph_indicators) if
                        element == graph_id]  # list the index of the graph_id locations
         graph_edges = df_edges[df_edges['from'].isin(id_location)]
         create_testgraph = Graph.TupleList(graph_edges.itertuples(index=False), directed=False, weights=True)
-        test_distance_matrix = np.asarray(Graph.shortest_paths_dijkstra(create_testgraph))
-        test_normalize = test_distance_matrix / np.nanmax(test_distance_matrix[test_distance_matrix != np.inf])
-        test_diagrams = ripser(test_normalize, thresh=thresh, maxdim=1, distance_matrix=True)[
-            'dgms']  # using thresh=1 because the largest number in the matrix is 1
-        # plot_diagrams(test_diagrams, title= "test persistence diagrams showing H_0 and H_1",  show=True)
-        testgraph_landscape = Landscape(num_landscapes=1, resolution=len(sample_range),
-                                        sample_range=[min(sample_range), max(sample_range)]).fit_transform(
-            test_diagrams)
-        test_landscape.append(testgraph_landscape[0] + testgraph_landscape[1])
+        create_dmatrix = np.asarray(Graph.shortest_paths_dijkstra(create_testgraph))
+        norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix[create_dmatrix != np.inf])
+        train_rips = ripser(norm_dmatrix, thresh=1, maxdim=1, distance_matrix=True)[
+            'dgms']
 
-        # plt.plot(testgraph_landscape)
-        # plt.title("Test data persistence landscape")
-        # plt.show()
+    #    splitting the dimension into 0 and 1
+        test_dgm_0 = train_rips[0]
+        test_dgm_1 = train_rips[1]
+
+    #    obtain persistence landscape values
+        landscape_init = gd.representations.Landscape(num_landscapes=1, resolution=1000)
+        land_scape = landscape_init.fit_transform([test_dgm_1])
+
+        test_landscape.append(land_scape)
+
     t3 = time()
     test_time = t3 - start3
 
     landscape_time = train_time + test_time
 
-    train_data = pd.DataFrame(train_landscape)
-    test_data = pd.DataFrame(test_landscape)
+    train_data = pd.DataFrame(np.concatenate(train_landscape))
+    test_data = pd.DataFrame(np.concatenate(test_landscape))
 
     return train_data, test_data, landscape_time
 
@@ -97,18 +107,20 @@ def tuning_hyperparameter():
     n_estimators = [int(a) for a in np.linspace(start=200, stop=500, num=5)]
     max_depth = [int(b) for b in np.linspace(start=2, stop=10, num=6)]
     num_cv = 10
+    bootstrap = [True, False]
     gridlength = len(n_estimators) * len(max_depth) * num_cv
     print(str(gridlength) + " RFs will be created in the grid search.")
-    Param_Grid = dict(n_estimators=n_estimators, max_depth=max_depth)
+    param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, bootstrap=bootstrap)
 
-    return Param_Grid, num_cv
+    return param_grid, num_cv
 
 
-def random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, landscape_time, num_cv):
+def random_forest(param_grid, train_data, test_data, y_train, y_test, landscape_time, num_cv):
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
     start5 = time()
+
     rfc = RandomForestClassifier()
-    grid = GridSearchCV(estimator=rfc, param_grid=Param_Grid, cv=num_cv, n_jobs=10)
+    grid = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=num_cv, n_jobs=10)
     grid.fit(train_data, y_train)
     param_choose = grid.best_params_
     if len(set(y_test)) > 2:  # multiclass case
@@ -130,7 +142,7 @@ def random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, l
     t5 = time()
     training_time = t5 - start5
 
-    print(f'Landscape took {landscape_time} seconds, training took {training_time} seconds')
+    print(f'Persistent took {landscape_time} seconds, training took {training_time} seconds')
     flat_conf_mat = (str(conf_mat.flatten(order='C')))[
                     1:-1]  # flatten confusion matrix into a single row while removing the [ ]
     file.write(dataset + "\t" + str(landscape_time) + "\t" + str(training_time) +
@@ -140,24 +152,22 @@ def random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, l
 
 
 def main():
-    X_train, X_test, y_train, y_test, graph_indicators, df_edges, graph_labels = read_csv(dataset)
-    train_landscape, train_time, sample_range = landscape_train(X_train, thresh, graph_indicators, df_edges, step_size)
-    train_data, test_data, landscape_time = landscape_test(X_test, thresh, graph_indicators, df_edges, sample_range,
-                                                           train_time, train_landscape)
-    Param_Grid, num_cv = tuning_hyperparameter()
-    random_forest(dataset, Param_Grid, train_data, test_data, y_train, y_test, landscape_time, num_cv)
+    x_train, x_test, y_train, y_test, graph_indicators, df_edges, graph_labels = reading_csv()
+    train_landscape, train_time = landscape_train(x_train, graph_indicators, df_edges)
+    train_data, test_data, landscape_time = landscape_test(x_test, graph_indicators, df_edges, train_time,
+                                                            train_landscape)
+    param_grid, num_cv = tuning_hyperparameter()
+    random_forest(param_grid, train_data, test_data, y_train, y_test, landscape_time, num_cv)
 
 
 if __name__ == '__main__':
     data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
     data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results3/" + 'rips_landscape.csv'
+    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'Rips_landscape.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
-        for thresh in [1]:
-            for step_size in [100]:  # we will consider stepsize 100 for epsilon
-                for duplication in np.arange(5):
-                    main()
+        for duplication in np.arange(5):
+            main()
     file.close()
 
 #
