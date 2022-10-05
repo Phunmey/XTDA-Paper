@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from time import time
 
 
-def read_data(dataset, data_path):
+def read_data():
 
     df_edges = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
     df_edges.columns = ['from', 'to']  # name the columns as from and to
@@ -54,6 +54,7 @@ def read_labels(node_labels, unique_nodes):
 
 def operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dict, graph_labels):
     start2 = time()
+
     transform_data = []
     for i in unique_graph_indicator:
         graphid = i
@@ -67,13 +68,13 @@ def operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dic
 
     random.seed(42)
 
-    G_train, G_test, y_train, y_test = train_test_split(transform_data, graph_labels, test_size=0.2, random_state=42)
+    g_train, g_test, y_train, y_test = train_test_split(transform_data, graph_labels, test_size=0.2, random_state=42)
 
     base_kernel = (WeisfeilerLehman, dict(base_graph_kernel=VertexHistogram)) #initialize a base kernel
     core_frame = CoreFramework(base_graph_kernel=base_kernel, min_core=-1, verbose=True)
 
-    train_data = core_frame.fit_transform(G_train)
-    test_data = core_frame.transform(G_test)
+    train_data = core_frame.fit_transform(g_train)
+    test_data = core_frame.transform(g_test)
 
     t2 = time()
     time2 = t2 - start2
@@ -81,21 +82,24 @@ def operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dic
     return train_data, test_data, y_train, y_test, time2
 
 def tuning_hyperparamters():
+
     n_estimators = [int(a) for a in np.linspace(start=200, stop=500, num=5)]
     max_depth = [int(b) for b in np.linspace(start=2, stop=10, num=6)]
     num_cv = 10
+    bootstrap = [True, False]
     gridlength = len(n_estimators) * len(max_depth) * num_cv
     print(str(gridlength) + " RFs will be created in the grid search.")
-    Param_Grid = dict(n_estimators=n_estimators, max_depth=max_depth)
+    param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, bootstrap=bootstrap)
 
-    return Param_Grid, num_cv
+    return param_grid, num_cv
 
 
-def random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, time2):
+def random_forest(train_data, test_data, y_train, y_test, param_grid, num_cv, time2):
     start3 = time()
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
+
     rfc = RandomForestClassifier()
-    grid = GridSearchCV(estimator=rfc, param_grid=Param_Grid, cv=num_cv, n_jobs=10)
+    grid = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=num_cv, n_jobs=10)
     grid.fit(train_data, y_train)
     param_choose = grid.best_params_
     if len(set(y_test)) > 2:  # multiclass case
@@ -124,19 +128,18 @@ def random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, ti
 
 
 def main():
-    unique_graph_indicator, df_edges, graph_indicators, graph_labels, node_labels, unique_nodes = read_data(dataset,
-                                                                                                            data_path)
+    unique_graph_indicator, df_edges, graph_indicators, graph_labels, node_labels, unique_nodes = read_data()
     nodes_dict = read_labels(node_labels, unique_nodes)
     train_data, test_data, y_train, y_test, time2 = operate_kernel(unique_graph_indicator, df_edges, graph_indicators,
                                                                    nodes_dict, graph_labels)
-    Param_Grid, num_cv = tuning_hyperparamters()
-    random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, time2)
+    param_grid, num_cv = tuning_hyperparamters()
+    random_forest(train_data, test_data, y_train, y_test, param_grid, num_cv, time2)
 
 
 if __name__ == '__main__':
     data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
     data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results3/" + 'CoreFramework.csv'
+    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results/" + 'CoreFramework.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
         for duplication in np.arange(5):
