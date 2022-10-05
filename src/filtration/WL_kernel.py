@@ -3,22 +3,21 @@ import pandas as pd
 import random
 from datetime import datetime
 from grakel.kernels import WeisfeilerLehman, VertexHistogram
-from igraph import *
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split, GridSearchCV
 from time import time
 
 
-def read_data(dataset, data_path):
+def read_data():
 
     df_edges = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
-    df_edges.columns = ['from', 'to'] #name the columns as from and to
+    df_edges.columns = ['from', 'to']  #name the columns as from and to
     unique_nodes = ((df_edges['from'].append(df_edges['to'])).unique()).tolist()  # list all nodes in the dataset
     print("Graph edges are loaded")
     csv = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_graph_indicator.txt", header=None) #returns a dataframe of graph indicators
-    csv.columns = ["ID"] #rename the column as ID
-    graph_indicators = (csv["ID"].values.astype(int)) #convert the dataframe to array of integers
+    csv.columns = ["ID"]  #rename the column as ID
+    graph_indicators = (csv["ID"].values.astype(int))  #convert the dataframe to array of integers
     print("Graph indicators are loaded")
     read_csv = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_graph_labels.txt", header=None)
     read_csv.columns = ["ID"]
@@ -41,16 +40,17 @@ def read_labels(node_labels, unique_nodes):
         if idx in unique_nodes:
             nodes_is = {idx:ele}
         else:
-            unique_nodes.append(idx) #if index is not found as node_id, append the index as a new node and give its corresponding node label
-            nodes_is = {idx:ele} #generated a random no
+            unique_nodes.append(idx)  #if index is not found as node_id, append the index as a new node and give its corresponding node label
+            nodes_is = {idx:ele}  #generated a random no
 
-        nodes_dict.update(nodes_is) #appending the dictionary to the outer dictionary
+        nodes_dict.update(nodes_is)  #appending the dictionary to the outer dictionary
 
     return nodes_dict
 
 
 def operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dict, graph_labels, iter_):
     start2 = time()
+
     transform_data = []
     for i in unique_graph_indicator:
         graphid = i
@@ -64,11 +64,11 @@ def operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dic
 
     random.seed(42)
 
-    G_train, G_test, y_train, y_test = train_test_split(transform_data, graph_labels, test_size=0.2, random_state=42)
+    g_train, g_test, y_train, y_test = train_test_split(transform_data, graph_labels, test_size=0.2, random_state=42)
 
-    WL = WeisfeilerLehman(n_iter=iter_, base_graph_kernel=VertexHistogram, verbose=True, normalize=True)
-    train_data = WL.fit_transform(G_train)
-    test_data = WL.transform(G_test)
+    wl = WeisfeilerLehman(n_iter=iter_, base_graph_kernel=VertexHistogram, verbose=True, normalize=True)
+    train_data = wl.fit_transform(g_train)
+    test_data = wl.transform(g_test)
 
     t2 = time()
     time2 = t2 - start2
@@ -80,17 +80,19 @@ def tuning_hyperparamters():
     n_estimators = [int(a) for a in np.linspace(start=200, stop=500, num=5)]
     max_depth = [int(b) for b in np.linspace(start=2, stop=10, num=6)]
     num_cv = 10
+    bootstrap = [True, False]
     gridlength = len(n_estimators) * len(max_depth) * num_cv
     print(str(gridlength) + " RFs will be created in the grid search.")
-    Param_Grid = dict(n_estimators=n_estimators, max_depth=max_depth)
+    param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, bootstrap=bootstrap)
 
-    return Param_Grid, num_cv
+    return param_grid, num_cv
 
-def random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, time2, iter_):
+def random_forest(train_data, test_data, y_train, y_test, param_grid, num_cv, time2, iter_):
     start3 = time()
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
+
     rfc = RandomForestClassifier()
-    grid = GridSearchCV(estimator=rfc, param_grid=Param_Grid, cv=num_cv, n_jobs=10)
+    grid = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=num_cv, n_jobs=10)
     grid.fit(train_data, y_train)
     param_choose = grid.best_params_
     if len(set(y_test)) > 2:  # multiclass case
@@ -108,6 +110,7 @@ def random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, ti
         accuracy = accuracy_score(y_test, test_pred)
         conf_mat = confusion_matrix(y_test, test_pred)
     print(dataset + " accuracy is " + str(accuracy) + ", AUC is " + str(auc))
+
     t3 = time()
     time3 = t3-start3
 
@@ -119,18 +122,16 @@ def random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, ti
     file.flush()
 
 def main():
-    unique_graph_indicator, df_edges, graph_indicators, graph_labels, node_labels, unique_nodes = read_data(dataset, data_path)
+    unique_graph_indicator, df_edges, graph_indicators, graph_labels, node_labels, unique_nodes = read_data()
     nodes_dict = read_labels(node_labels,unique_nodes)
     train_data, test_data, y_train, y_test, time2 = operate_kernel(unique_graph_indicator, df_edges, graph_indicators, nodes_dict, graph_labels, iter_)
-    Param_Grid, num_cv = tuning_hyperparamters()
-    random_forest(train_data, test_data, y_train, y_test, Param_Grid, num_cv, time2, iter_)
-
-
+    param_grid, num_cv = tuning_hyperparamters()
+    random_forest(train_data, test_data, y_train, y_test, param_grid, num_cv, time2, iter_)
 
 if __name__ == '__main__':
     data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
-    data_list = ('REDDIT-MULTI-5K', 'REDDIT-MULTI-12K', 'ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results3/" + 'WLresults.csv'
+    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
+    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'WLresults.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
         for iter_ in (2,3):
