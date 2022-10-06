@@ -96,22 +96,30 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
     betti1 = obtain_mean.iloc[100:200]
     betti2 = obtain_mean.iloc[200:]
 
-    sns.lineplot(x=x, y=betti0)
-    sns.lineplot(x=x, y=betti1)
-    sns.lineplot(x=x, y=betti2)
+
+#    using plt.plot because the server doesn't recognize 2 inputs for seaborn lineplot
+    plt.plot(x, betti0, label='B0')
+    plt.plot(x, betti1, label='B1')
+    plt.plot(x, betti2, label='B2')
+
+
+    # sns.lineplot(x=x, y=betti0)
+    # sns.lineplot(x=x, y=betti1)
+    # sns.lineplot(x=x, y=betti2)
 
     plt.box(False)
     plt.xlabel(r"$\epsilon$")
     plt.ylabel('mean frequency')
-    plt.legend(labels=['B0', 'B1', 'B2'])
+    plt.legend()
+    plt.show()
+    plt.clf()
 
 
 
     # ax0.fill_between(x, quartiles1[:100], quartiles3[:100], alpha=0.3)
     # ax1.fill_between(x, quartiles1[100:200], quartiles3[100:200], alpha=0.3)
     # ax2.fill_between(x, quartiles1[200:], quartiles3[200:], alpha=0.3)
-    plt.show()
-    plt.clf()
+
 
 
     plt.savefig("C:/XTDA-Paper/betti_plots_rips/" + dataset + ".png")
