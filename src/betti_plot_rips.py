@@ -5,7 +5,7 @@ import pandas as pd
 from igraph import *
 import matplotlib.pyplot as plt
 from ripser import ripser
-from sklearn.preprocessing import normalize
+from matplotlib.lines import Line2D
 import seaborn as sns; sns.set(style='white')
 
 random.seed(42)
@@ -101,11 +101,6 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
     norm_2 = betti2/np.nanmax(betti2) #normalize([betti2], norm="max")
 
 #    compose legend elements
-
-
-    from matplotlib.lines import Line2D
-
-
 
 
 #    using plt.plot because the server doesn't recognize 2 inputs for seaborn lineplot
