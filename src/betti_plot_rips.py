@@ -72,17 +72,17 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
                     b_2 = b_2 + 1
             train_betti_2.append(b_2)
 
-        norm_0 = normalize([train_betti_0], norm="max")
-        norm_1 = normalize([train_betti_1], norm="max")
-        norm_2 = normalize([train_betti_2], norm="max")
+        # norm_0 = normalize([train_betti_0], norm="max")
+        # norm_1 = normalize([train_betti_1], norm="max")
+        # norm_2 = normalize([train_betti_2], norm="max")
 
-        conc = np.concatenate((norm_0, norm_1, norm_2), axis=1)
+        # conc = np.concatenate((norm_0, norm_1, norm_2), axis=1)
+        #
+        # train_betti.append(conc)
 
-        train_betti.append(conc)
+        train_betti.append(train_betti_0 + train_betti_1 + train_betti_2)
 
-       # train_betti.append(train_betti_0 + train_betti_1 + train_betti_2)
-
-    train_data = pd.DataFrame(np.concatenate(train_betti))
+    train_data = pd.DataFrame(train_betti)
 #    summarized_df = train_data.describe()
 
     obtain_mean = train_data.mean(axis=0)
@@ -96,13 +96,26 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
     betti1 = obtain_mean.iloc[100:200]
     betti2 = obtain_mean.iloc[200:]
 
+    norm_0 = betti0/np.nanmax(betti0) #normalize([betti0], norm="max")
+    norm_1 = betti1/np.nanmax(betti1) #normalize([betti1], norm="max")
+    norm_2 = betti2/np.nanmax(betti2) #normalize([betti2], norm="max")
+
+#    compose legend elements
+
+
+    from matplotlib.lines import Line2D
+
+
+
 
 #    using plt.plot because the server doesn't recognize 2 inputs for seaborn lineplot
-    plt.plot(x, betti0, label='B0')
-    plt.plot(x, betti1, label='B1')
-    plt.plot(x, betti2, label='B2')
+    plt.plot(x, norm_0, color='b') #, label='B0', marker='o', color='b')
+    plt.plot(x, norm_1, color='r') #, label='B1', marker='^', color='k')
+    plt.plot(x, norm_2, color='k') #, label='B2', marker='s', color='r')
 
-
+    legend_elements = [Line2D([0], [0], marker='o', color='b', label='B0', markersize=10),
+                       Line2D([0], [0], marker='^', color='r', label='B1', markersize=10),
+                       Line2D([0], [0], marker='s', color='k', label='B2', markersize=10)]
     # sns.lineplot(x=x, y=betti0)
     # sns.lineplot(x=x, y=betti1)
     # sns.lineplot(x=x, y=betti2)
@@ -110,7 +123,7 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
     plt.box(False)
     plt.xlabel(r"$\epsilon$")
     plt.ylabel('mean frequency')
-    plt.legend()
+    plt.legend(handles=legend_elements, bbox_to_anchor=(0.5, 0.6, 0.4, 0.5), loc='center', frameon=False)
     plt.show()
     plt.clf()
 
@@ -123,7 +136,7 @@ def ripser_train(unique_graph_indicator, thresh, graph_indicators, df_edges, ste
 
 
     plt.savefig("C:/XTDA-Paper/betti_plots_rips/" + dataset + ".png")
-    plt.clf()
+    # plt.clf()
 
     return
 
@@ -135,7 +148,7 @@ def main():
 
 if __name__ == '__main__':
     data_path = sys.argv[1]  # dataset path on computer
-    data_list = ('MUTAG', 'ENZYMES', 'BZR', 'PROTEINS', 'DHFR', 'NCI1', 'COX2')#, 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
+    data_list = ('MUTAG', 'BZR')#, 'ENZYMES',  'PROTEINS', 'DHFR', 'NCI1', 'COX2')#, 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
     for dataset in data_list:
         for thresh in [1]:
             for step_size in [100]:  # we will consider stepsize 100 for epsilon
