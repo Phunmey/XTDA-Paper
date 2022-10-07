@@ -52,6 +52,6 @@ def reading_csv():
 
 if __name__ == '__main__':
     data_path = sys.argv[1]
-    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
+    data_list = ('DHFR', 'COX2', 'ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
     for dataset in data_list:
         reading_csv()
