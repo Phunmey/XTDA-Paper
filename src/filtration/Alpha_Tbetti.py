@@ -14,7 +14,6 @@ random.seed(42)
 
 
 def reading_csv():
-
     df_edges = pd.read_csv(data_path + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
     df_edges.columns = ['from', 'to']
     print("Graph edges are loaded")
@@ -40,7 +39,7 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train t
 
     train_betti = []
     for i in x_train:
-        graph_id = i
+        graph_id = 4977
         id_location = [index + 1 for index, element in enumerate(graph_indicators) if
                        element == graph_id]  # list the index of the graph_id locations
         graph_edges = df_edges[df_edges['from'].isin(id_location)]
@@ -52,24 +51,34 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train t
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = TSNE(n_components=2, learning_rate='auto').fit_transform(norm_subg)
-                mds_list.append(mds)
+                if len(norm_subg) != 2:
+                    mds = TSNE(n_components=2, metric='precomputed', perplexity=2, learning_rate='auto').fit_transform(
+                        norm_subg)
+                    mds_list.append(mds)
+                else:
+                    mds_list.append(norm_subg)
+                # mds = TSNE(n_components=2, metric='precomputed', learning_rate='auto').fit_transform(norm_subg)
+                # mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
             create_dmatrix = np.asarray(Graph.shortest_paths_dijkstra(create_traingraph))
             norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix)
-            matrix_mds = TSNE(n_components=2, learning_rate='auto').fit_transform(norm_dmatrix)
+            if len(norm_dmatrix) != 2:
+                matrix_mds = TSNE(n_components=2, metric='precomputed', perplexity=2, learning_rate='auto').fit_transform(
+                    norm_dmatrix)
+            else:
+                matrix_mds = norm_dmatrix
 
         train_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
         train_dgm = train_ac.persistence()  # obtain persistence values
-    #    gd.plot_persistence_diagram(train_dgm)
-    #    plt.show()
+        #    gd.plot_persistence_diagram(train_dgm)
+        #    plt.show()
 
-    #    select dimensions 0 and 1
+        #    select dimensions 0 and 1
         train_dgm_0 = train_ac.persistence_intervals_in_dimension(0)
         train_dgm_1 = train_ac.persistence_intervals_in_dimension(1)
 
-    #    obtain betti numbers for the unique dimensions
+        #    obtain betti numbers for the unique dimensions
         train_betti_0 = []
         train_betti_1 = []
 
@@ -95,6 +104,7 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train t
 
     return train_data, train_time
 
+
 def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for the train test
     start2 = time()
 
@@ -112,24 +122,29 @@ def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for t
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = TSNE(n_components=2, learning_rate='auto').fit_transform(norm_subg)
+                mds = TSNE(n_components=2, metric='precomputed', learning_rate='auto').fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
             create_dmatrix = np.asarray(Graph.shortest_paths_dijkstra(create_testgraph))
             norm_dmatrix = create_dmatrix / np.nanmax(create_dmatrix)
-            matrix_mds = TSNE(n_components=2, learning_rate='auto').fit_transform(norm_dmatrix)
+            if len(norm_dmatrix) != 2:
+                matrix_mds = TSNE(n_components=2, metric='precomputed', perplexity=2,
+                                  learning_rate='auto').fit_transform(
+                    norm_dmatrix)
+            else:
+                matrix_mds = norm_dmatrix
 
         test_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
         test_dgm = test_ac.persistence()  # obtain persistence values
-    #    gd.plot_persistence_diagram(train_dgm)
-    #    plt.show()
+        #    gd.plot_persistence_diagram(train_dgm)
+        #    plt.show()
 
-    #    select dimensions 0 and 1
+        #    select dimensions 0 and 1
         test_dgm_0 = test_ac.persistence_intervals_in_dimension(0)
         test_dgm_1 = test_ac.persistence_intervals_in_dimension(1)
 
-    #    obtain betti numbers for the unique dimensions
+        #    obtain betti numbers for the unique dimensions
         test_betti_0 = []
         test_betti_1 = []
 
@@ -215,13 +230,14 @@ def main():
 
 
 if __name__ == '__main__':
-    data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
-    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'Alpha_Tbetti.csv'
+    data_path = sys.argv[1]  # dataset path on computer
+    data_list = [
+        'REDDIT-MULTI-5K']  # , 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
+    outputFile = "../../results/" + 'Alpha_Tbetti.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
         for step_size in [100]:  # we will consider step size 100 for epsilon
-            for duplication in np.arange(5):
+            for duplication in np.arange(1):
                 main()
     file.close()
 

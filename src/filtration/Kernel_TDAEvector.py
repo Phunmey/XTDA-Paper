@@ -1,6 +1,7 @@
 import random
 from datetime import datetime
 from time import time
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from grakel.kernels import WeisfeilerLehman, VertexHistogram
@@ -9,7 +10,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV
 
-def reading_csv(dataset, datapath):
+
+def reading_csv():
 
     edges_asdf = pd.read_csv(datapath + "/" + dataset + "/" + dataset + "_A.txt", header=None)  # import edge data
     edges_asdf.columns = ['from', 'to']
@@ -48,10 +50,12 @@ def read_labels(node_labels, unique_nodes):
 
     return nodes_dict
 
-def activation_discovery(dataset, edges_asdf, graphindicator, unique_graphindicator):
+
+def activation_discovery(edges_asdf, graphindicator, unique_graphindicator):
     # this function obtains the degrees(called activation_values) across all data and draws bar plots for them
 
     progress = len(unique_graphindicator)
+    total_degree = {}
     node_degree_max = []  # list of the node degree maximums
     node_degree_min = []  # list of the node degree minimums
     print(dataset + " has " + str(progress) + " graphs.")
@@ -64,9 +68,23 @@ def activation_discovery(dataset, edges_asdf, graphindicator, unique_graphindica
             edges_asdf['from'].isin(graphid_loc1)]  # obtain edges that corresponds to these locations
         a_graph1 = Graph.TupleList(edges_loc1.itertuples(index=False), directed=False, weights=True)
         activation_values = a_graph1.vs.degree()  # obtain node degrees
-        # activation_values = [int(i) for i in np.asarray((a_graph1.betweenness()))] #obtain betweenness
+    #    activation_values = [int(i) for i in np.asarray((a_graph1.betweenness()))] #obtain betweenness
         node_degree_max.append(max(activation_values))
         node_degree_min.append(min(activation_values))
+
+        for i in activation_values:
+            total_degree[i] = total_degree.get(i, 0) + 1
+            # i is the key we want to return its value
+            # dict.get(i,0) gives 0 if the key does not exist.
+            # dict[i] is now assigned a value 1 (+1) which is an increment
+    plt.bar(total_degree.keys(), total_degree.values(), color='b')  # 1 represents width
+#    plt.xticks(np.arange(min(node_degree_min), max(node_degree_max) + 1))
+    plt.yscale('log')
+    plt.xlabel('Degrees')
+    plt.ylabel('Fraction of nodes')  # obtained by dividing the node count of the filtration by the data node count
+    plt.title(dataset)
+    plt.savefig("/home/taiwo/projects/def-cakcora/taiwo/result/degree_dist_figures/" + dataset + "DegreeStats.png")
+    print(dataset + " degree computations are completed.")
 
     max_activation = max(node_degree_max)  # obtain the maximum of the degree maximums
     min_activation = min(node_degree_min)  # obtain the minimum of the degree minimums
@@ -76,7 +94,7 @@ def activation_discovery(dataset, edges_asdf, graphindicator, unique_graphindica
     return max_activation, min_activation, progress
 
 
-def filtration_discovery(dataset, filtration, h_filt, max_activation, max_allowed_filtration, min_activation):
+def filtration_discovery(max_activation, min_activation):
     # this function computes the sublevel and superlevel filtrations
 
     start1 = time()
@@ -119,7 +137,7 @@ def filtration_discovery(dataset, filtration, h_filt, max_activation, max_allowe
     return filtr_range, filt_time
 
 
-def kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, filtration, dataset, graphindicator, iter, progress,
+def kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, graphindicator, progress,
                     nodes_dict, graphlabels_aslist, filt_time):
     start4 = time()
 
@@ -132,10 +150,10 @@ def kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, filtration, 
         edges_loc = edges_asdf[edges_asdf['from'].isin(graphid_loc)]  # obtain edges that corresponds to these locations
         a_graph = Graph.TupleList(edges_loc.itertuples(index=False), directed=False, weights=True)
         activation_values = a_graph.vs.degree()
-        # activation_values =[int(i) for i in np.asarray((a_graph.betweenness()))]
+    #   activation_values =[int(i) for i in np.asarray((a_graph.betweenness()))]
 
         wl_data = []
-        for indx, deg in enumerate(filtr_range, start=0):
+        for indx, deg in enumerate(filtr_range):
             if filtration == "sublevel":
                 extract_vs = a_graph.vs.select([v for v, b in enumerate(activation_values) if
                                                 b <= deg])  # returns vertexsequence that satisfies the "for" condition
@@ -149,19 +167,19 @@ def kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, filtration, 
                 index=False))  # returns list of edges if both nodes are in subname(or are endpoints)
 
             if subedges == []:
-                wl_data.append([{(0, 0)}, {0: 0}])  #fill in this for all instances of empty subedges
+                wl_data.append([{(0, 0)}, {0: 0}])  # fill in this for all instances of empty subedges
             else:
-                setedges = {tuple(item for item in pair) for pair in subedges}  #extract the edges if they exist
-                nodes_concat = [setedges, subdict]  #concatenate with the dictioanries
-                wl_data.append(nodes_concat)  #append to the data list
+                setedges = {tuple(item for item in pair) for pair in subedges}  # extract the edges if they exist
+                nodes_concat = [setedges, subdict]  # concatenate with the dictioanries
+                wl_data.append(nodes_concat)  # append to the data list
 
-        wl = WeisfeilerLehman(n_iter=iter, base_graph_kernel=VertexHistogram, normalize=True)
+        wl = WeisfeilerLehman(n_iter=iter_, base_graph_kernel=VertexHistogram, normalize=True)
         wl_transform = wl.fit_transform(wl_data)
-        eigen_value, eigen_vector = np.linalg.eig(wl_transform)  #obtain the eigenvectors of the Gram(kernel) matrix
-        compute_mean = (np.real(eigen_vector)).flatten('F')
-        feature_matrix.append(compute_mean)  #compute vector mean and append to the feature matrix
+        eigen_value, eigen_vector = np.linalg.eig(wl_transform)  # obtain the eigenvectors of the Gram(kernel) matrix
+        flatten_vector = (np.real(eigen_vector)).flatten('F')
+        feature_matrix.append(flatten_vector)  # flatten vector and append to the feature matrix
 
-    rfc_input = pd.DataFrame(feature_matrix) #convert feature matrix to dataframe
+    rfc_input = pd.DataFrame(feature_matrix)  # convert feature matrix to dataframe
 
     print(dataset + " has a feature matrix of " + str(rfc_input.shape))
 
@@ -171,8 +189,9 @@ def kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, filtration, 
     total_time = (filt_time + time_taken)
 
     random.seed(42)
+
     g_train, g_test, y_train, y_test = train_test_split(rfc_input, graphlabels_aslist, test_size=0.2,
-                                                        random_state=random.randint(0, 100))
+                                                        random_state=42)
 
     return g_train, g_test, y_train, y_test, total_time
 
@@ -181,20 +200,21 @@ def rf_preprocess():
     n_estimators = [int(a) for a in np.linspace(start=200, stop=500, num=5)]
     max_depth = [int(b) for b in np.linspace(start=2, stop=10, num=6)]
     num_cv = 10
+    bootstrap = [True, False]
     gridlength = len(n_estimators) * len(max_depth) * num_cv
     print(str(gridlength) + " RFs will be created in the grid search.")
-    Param_Grid = dict(n_estimators=n_estimators, max_depth=max_depth)
+    param_grid = dict(n_estimators=n_estimators, max_depth=max_depth, bootstrap=bootstrap)
 
-    return Param_Grid, num_cv
+    return param_grid, num_cv
 
 
-def train_test_rf(Param_Grid, dataset, g_test, g_train, num_cv, y_test, y_train, total_time, file, h_filt, iter,
-                  filtration):
-    # start training
+def train_test_rf(param_grid, g_test, g_train, num_cv, y_test, y_train, total_time):
+    #  start training
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
     start5 = time()
+
     rfc = RandomForestClassifier()
-    grid = GridSearchCV(estimator=rfc, param_grid=Param_Grid, cv=num_cv, n_jobs=10)
+    grid = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=num_cv, n_jobs=10)
     grid.fit(g_train, y_train)
     param_choose = grid.best_params_
     if len(set(y_test)) > 2:  # multiclass case
@@ -221,40 +241,31 @@ def train_test_rf(Param_Grid, dataset, g_test, g_train, num_cv, y_test, y_train,
 
     print(f'Kernel_TDA took {total_time} seconds, training took {training_time} seconds')
     flat_conf_mat = (str(conf_mat.flatten(order='C')))[1:-1]
-    file.write(dataset + "\t" + str(total_time) + "\t" + str(training_time)  +
-               "\t" + str(accuracy) + "\t" + str(auc) + "\t" + str(iter) + "\t" + str(filtration) + "\t" + str(
-        h_filt) + "\t" +
-               str(flat_conf_mat) + "\n")
+    file.write(dataset + "\t" + str(total_time) + "\t" + str(training_time) + "\t" + str(accuracy) + "\t" + str(auc) + "\t" + str(iter_) + "\t" + str(filtration) + "\t" + str(h_filt) + "\t" + str(flat_conf_mat) + "\n")
     file.flush()
 
+
 def main():
-    unique_graphindicator, graphlabels_aslist, node_labels, graphindicator, edges_asdf, unique_nodes = reading_csv(
-        dataset, datapath)
+    unique_graphindicator, graphlabels_aslist, node_labels, graphindicator, edges_asdf, unique_nodes = reading_csv()
     nodes_dict = read_labels(node_labels, unique_nodes)
-    max_activation, min_activation, progress = activation_discovery(dataset, edges_asdf, graphindicator,
+    max_activation, min_activation, progress = activation_discovery(edges_asdf, graphindicator,
                                                                     unique_graphindicator)
-    filtr_range, filt_time = filtration_discovery(dataset, filtration, h_filt, max_activation,
-                                                           max_allowed_filtration, min_activation)
-    g_train, g_test, y_train, y_test, total_time = kernelize_graph(unique_graphindicator, edges_asdf,
-                                                                       filtr_range,
-                                                                       filtration, dataset, graphindicator, iter,
-                                                                       progress, nodes_dict, graphlabels_aslist, filt_time)
-    Param_Grid, num_cv = rf_preprocess()
-    train_test_rf(Param_Grid, dataset, g_test, g_train, num_cv, y_test, y_train, total_time, file, h_filt, iter,
-                  filtration)
+    filtr_range, filt_time = filtration_discovery(max_activation, min_activation)
+    g_train, g_test, y_train, y_test, total_time = kernelize_graph(unique_graphindicator, edges_asdf, filtr_range, graphindicator, progress, nodes_dict, graphlabels_aslist, filt_time)
+    param_grid, num_cv = rf_preprocess()
+    train_test_rf(param_grid, g_test, g_train, num_cv, y_test, y_train, total_time)
+
 
 if __name__ == '__main__':
-    datapath = "/home/taiwo/projects/def-cakcora/taiwo/data"	#dataset path on computer
+    datapath = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
     data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/results3/" + 'Kernel_TDAEvector.csv'
+    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'Kernel_TDAUpper.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
         for filtration in ('superlevel', 'sublevel'):
             for h_filt in (True, False):
-                for iter in (2, 3): #we will consider step size 100 for epsilon
-                    for duplication in np.arange(5):
-                        for max_allowed_filtration in [100]:
+                for iter_ in (2, 3):  # we will consider step size 100 for epsilon
+                    for max_allowed_filtration in [100]:
+                        for duplication in np.arange(5):
                             main()
     file.close()
-
-

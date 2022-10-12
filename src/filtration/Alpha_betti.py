@@ -61,7 +61,7 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train t
             matrix_mds = MDS(n_components=2, dissimilarity='precomputed').fit_transform(norm_dmatrix)
 
         train_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
-    #    train_dgm = train_ac.persistence()  # obtain persistence values
+        train_dgm = train_ac.persistence()  # obtain persistence values
     #    gd.plot_persistence_diagram(train_dgm)
     #    plt.show()
 
@@ -121,7 +121,7 @@ def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for t
             matrix_mds = MDS(n_components=2, dissimilarity='precomputed').fit_transform(norm_dmatrix)
 
         test_ac = gd.AlphaComplex(points=matrix_mds).create_simplex_tree()
-    #    test_dgm = test_ac.persistence()  # obtain persistence values
+        test_dgm = test_ac.persistence()  # obtain persistence values
     #    gd.plot_persistence_diagram(train_dgm)
     #    plt.show()
 

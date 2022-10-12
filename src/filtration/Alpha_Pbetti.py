@@ -1,6 +1,7 @@
 import random
 from datetime import datetime
 from time import time
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from igraph import *
@@ -9,6 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV
+
 
 random.seed(42)
 
@@ -45,14 +47,18 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train t
                        element == graph_id]  # list the index of the graph_id locations
         graph_edges = df_edges[df_edges['from'].isin(id_location)]
         create_traingraph = Graph.TupleList(graph_edges.itertuples(index=False), directed=False, weights=True)
-
+        #plot(create_traingraph)
         if not create_traingraph.is_connected():
             graph_decompose = create_traingraph.decompose()
             mds_list = []
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = PCA(n_components=2).fit_transform(norm_subg)
+                if not np.linalg.det(norm_subg):
+                    conv_subg = np.linalg.pinv(norm_subg)  # use pseudoinverse if norm_subg is singular
+                    mds = PCA(n_components=2).fit_transform(conv_subg)
+                else:
+                    mds = PCA(n_components=2).fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
@@ -112,7 +118,11 @@ def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for t
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = PCA(n_components=2).fit_transform(norm_subg)
+                if not np.linalg.det(norm_subg):
+                    conv_subg = np.linalg.pinv(norm_subg)  # use pseudoinverse if norm_subg is singular
+                    mds = PCA(n_components=2).fit_transform(conv_subg)
+                else:
+                    mds = PCA(n_components=2).fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
@@ -215,9 +225,9 @@ def main():
 
 
 if __name__ == '__main__':
-    data_path = "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
-    data_list = ('ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
-    outputFile = "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'Alpha_Pbetti.csv'
+    data_path = sys.argv[1]  # "/home/taiwo/projects/def-cakcora/taiwo/data"  # dataset path on computer
+    data_list = ('REDDIT-MULTI-5K', 'ENZYMES', 'BZR', 'MUTAG', 'PROTEINS', 'DHFR', 'NCI1', 'COX2', 'REDDIT-MULTI-5K', 'REDDIT-MULTI-12K')
+    outputFile = "C:/XTDA-Paper/results/" + 'A.csv'  # "/home/taiwo/projects/def-cakcora/taiwo/result/" + 'Alpha_Pbetti.csv'
     file = open(outputFile, 'w')
     for dataset in data_list:
         for step_size in [100]:  # we will consider step size 100 for epsilon

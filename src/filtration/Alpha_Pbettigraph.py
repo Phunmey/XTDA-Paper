@@ -60,7 +60,11 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train d
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = PCA(n_components=2).fit_transform(norm_subg)
+                if not np.linalg.det(norm_subg):
+                    conv_subg = np.linalg.pinv(norm_subg)  # use pseudoinverse if norm_subg is singular
+                    mds = PCA(n_components=2).fit_transform(conv_subg)
+                else:
+                    mds = PCA(n_components=2).fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
@@ -156,7 +160,11 @@ def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for t
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                mds = PCA(n_components=2).fit_transform(norm_subg)
+                if not np.linalg.det(norm_subg):
+                    conv_subg = np.linalg.pinv(norm_subg)  # use pseudoinverse if norm_subg is singular
+                    mds = PCA(n_components=2).fit_transform(conv_subg)
+                else:
+                    mds = PCA(n_components=2).fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
