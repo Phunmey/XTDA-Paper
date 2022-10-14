@@ -40,7 +40,7 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train d
     start2 = time()
 
     train_betti = []
-    h_0 = 0
+
     for i in x_train:
         graph_id = i
         id_location = [index + 1 for index, element in enumerate(graph_indicators) if
@@ -54,11 +54,7 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train d
             for subg in graph_decompose:
                 create_subg = np.asarray(Graph.shortest_paths_dijkstra(subg))
                 norm_subg = create_subg / np.nanmax(create_subg)
-                if not np.linalg.det(norm_subg):
-                    conv_subg = np.linalg.pinv(norm_subg)  # use pseudoinverse if norm_subg is singular
-                    mds = PCA(n_components=2).fit_transform(conv_subg)
-                else:
-                    mds = PCA(n_components=2).fit_transform(norm_subg)
+                mds = PCA(n_components=2).fit_transform(norm_subg)
                 mds_list.append(mds)
             matrix_mds = (np.vstack(mds_list))
         else:
@@ -89,14 +85,14 @@ def alpha_train(x_train, graph_indicators, df_edges):  # this is for the train d
     t2 = time()
     train_time = t2 - start2
 
-    return train_data, train_time, h_0
+    return train_data, train_time
 
 
-def alpha_test(x_test, graph_indicators, df_edges, train_time, h_0):  # this is for the train test
+def alpha_test(x_test, graph_indicators, df_edges, train_time):  # this is for the train test
     start3 = time()
 
     test_betti = []
-    h_1 = 0
+
     for j in x_test:
         graph_id = j
         id_location = [index + 1 for index, element in enumerate(graph_indicators) if
@@ -146,9 +142,8 @@ def alpha_test(x_test, graph_indicators, df_edges, train_time, h_0):  # this is 
     test_time = t3 - start3
 
     alpha_time = train_time + test_time
-    total_betti = h_0 + h_1
 
-    return test_data, alpha_time, total_betti
+    return test_data, alpha_time
 
 
 def tuning_hyperparameter():
@@ -163,7 +158,7 @@ def tuning_hyperparameter():
     return param_grid, num_cv
 
 
-def random_forest(param_grid, train_data, test_data, y_train, y_test, alpha_time, num_cv, total_betti):
+def random_forest(param_grid, train_data, test_data, y_train, y_test, alpha_time, num_cv):
     print(dataset + " training started at", datetime.now().strftime("%H:%M:%S"))
     start5 = time()
 
@@ -194,17 +189,17 @@ def random_forest(param_grid, train_data, test_data, y_train, y_test, alpha_time
     flat_conf_mat = (str(conf_mat.flatten(order='C')))[
                     1:-1]  # flatten confusion matrix into a single row while removing the [ ]
     file.write(dataset + "\t" + str(alpha_time) + "\t" + str(training_time) +
-               "\t" + str(accuracy) + "\t" + str(auc) + "\t" + str(total_betti) + "\t" + str(flat_conf_mat) + "\n")
+               "\t" + str(accuracy) + "\t" + str(auc) + "\t" + str(flat_conf_mat) + "\n")
 
     file.flush()
 
 
 def main():
     x_train, x_test, y_train, y_test, graph_indicators, df_edges, graph_labels = reading_csv()
-    train_data, train_time, h_0 = alpha_train(x_train, graph_indicators, df_edges)
-    test_data, alpha_time, total_betti = alpha_test(x_test, graph_indicators, df_edges, train_time, h_0)
+    train_data, train_time = alpha_train(x_train, graph_indicators, df_edges)
+    test_data, alpha_time = alpha_test(x_test, graph_indicators, df_edges, train_time)
     param_grid, num_cv = tuning_hyperparameter()
-    random_forest(param_grid, train_data, test_data, y_train, y_test, alpha_time, num_cv, total_betti)
+    random_forest(param_grid, train_data, test_data, y_train, y_test, alpha_time, num_cv)
 
 
 if __name__ == '__main__':
