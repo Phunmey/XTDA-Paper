@@ -8,12 +8,13 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 # read data
-statistics = "C:/XTDA-Paper/results/Obtain_gstatistics.csv"
-merged_df = pd.read_csv(statistics, sep=',')
+statistics = "/Users/taiwom1/XTDA-Paper/results/Obtain_gstatistics.csv"
+reading_csv = pd.read_csv(statistics, sep=',')
 
 # split the motifs column into 4 different columns and drop columns
-merged_df[["motif1", "motif2", "motif3", "motif4"]] = merged_df["motifs"].str.split(",", expand=True)
-merged_df = merged_df.drop(["clustering_coeff", "graph_diameter", "motifs", "motif1", "motif2", "cliques", "components"], axis=1) #drop the index column from the dataframe
+reading_csv[["motif1", "motif2", "motif3", "motif4"]] = reading_csv["motifs"].str.split(",", expand=True)
+reading_csv = reading_csv.drop(["clustering_coeff", "graph_diameter", "motifs", "motif1", "motif2", "cliques", "components"], axis=1) #drop the index column from the dataframe
+merged_df = reading_csv.fillna(0)
 
 # group data based on the smallest data length which is mutag
 df = merged_df.groupby(['dataset']).apply(lambda grp: grp.sample(n=187)) #mutag has 188 graphs
@@ -47,7 +48,7 @@ y_visual = df.dataset_graphlabel
 
 html = mapper.visualize(
     graph,
-    path_html="C:/XTDA-Paper/mapper_plot/mapper.html",
+    path_html="/Users/taiwom1/XTDA-Paper/mapper_plot/mapper.html",
     title="mapper data",
     custom_tooltips=y_visual) # Visualize the graph
 
