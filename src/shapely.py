@@ -22,8 +22,7 @@ def data_csv():
     read_data = read_data.drop(["graph_label", "motifs", "motif1", "motif2"],
                                axis=1)  # drop the index column from the dataframe
 
-    x = read_data[read_data.columns[1:]]
-    #    X = X.fillna(0)  # Features
+    x = read_data[read_data.columns[1:]]  # features
     y = read_data['dataset']  # Labels
 
     return x, y
@@ -56,7 +55,8 @@ def vanilla_fi(x, x_test, y_test, clf):
     ax.set_title("feature importances using mdi")
     ax.set_ylabel("mean decrease in impurity")
     fig.tight_layout()
-    plt.savefig('/Users/taiwom1/XTDA-Paper/figures/fi_mdi2.png')
+    #    plt.savefig('/Users/taiwom1/XTDA-Paper/figures/fi_mdi2.png')
+    #    plt.savefig('C:/XTDA-Paper/mapper_plot/fi_mdi2.png')
 
     #    feature importance computed with permutation method
     perm_importance = permutation_importance(clf, x_test, y_test, n_repeats=10, random_state=42, n_jobs=2)
@@ -67,7 +67,8 @@ def vanilla_fi(x, x_test, y_test, clf):
     ax.set_title("feature importances using permutation on full model")
     ax.set_ylabel("mean accuracy decrease")
     fig.tight_layout()
-    plt.savefig('/Users/taiwom1/XTDA-Paper/figures/fi_permutation2.png')
+    #    plt.savefig('/Users/taiwom1/XTDA-Paper/figures/fi_permutation2.png')
+    #    plt.savefig('C:/XTDA-Paper/mapper_plot/fi_permutation2.png')
 
     return features
 
@@ -81,7 +82,9 @@ def shap_vals(clf, x_train, features):
     class_names = ["ENZYMES", "BZR", "COX2", "DHFR", "MUTAG", "NCI1", "PROTEINS", "REDDIT-MULTI-5K", "REDDIT-MULTI-12K"]
     shap.summary_plot(shap_values, x_train, feature_names=features, class_names=class_names, show=False,
                       plot_size=(16, 10))
-    plt.savefig('C:Code/other_figures/shap_dataset.png')
+    #    plt.savefig('C:Code/other_figures/shap_dataset.png')
+    plt.savefig('C:/XTDA-Paper/mapper_plot/shap_dataset.png')
+    print("I am done here")
     # shap.summary_plot(shap_values[i (for i= 0, 1 ..., n)], X_test, feature_names=features, show=False) #for dot plot. This can be generated for a single class(or observation) at a time
 
     return shap_values, class_names
@@ -113,7 +116,7 @@ def shap_feature_ranking(x_train, shap_values, features, class_names):
     df_ranking = shap_importance.sort_values(by=['mean_of_feature'], ascending=False)
     # df_ranking.index += 1
 
-    df_ranking.to_csv("/Users/taiwom1/XTDA-Paper/results/df_rank.csv")
+    df_ranking.to_csv("C:/XTDA-Paper/results/df_rank.csv")
 
     return df_ranking
 
